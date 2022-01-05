@@ -15,6 +15,13 @@ import talib
 from datetime import timedelta,time
 from .object import BarData, TickData
 from .constant import Exchange, Interval
+# XLK增加------------------------------------------------------------------------------------
+import pandas as pd
+import matplotlib.pyplot as plt
+import math
+import pywt
+from numpy import polyfit, poly1d
+from scipy.signal import savgol_filter
 
 
 log_formatter = logging.Formatter('[%(asctime)s] %(message)s')
@@ -856,6 +863,81 @@ class ArrayManager(object):
         if array:
             return result
         return result[-1]
+
+    # XLK增加------------------------------------------------------------------------------------
+
+    def wavelet_noising(self, n: int, array: bool = False) -> Union[float, np.ndarray]:
+        data = self.close[-n:-1]
+        # data = data.values.T.tolist()  # 将np.ndarray()转为列表
+        w = pywt.Wavelet('sym20')  # 选择dB10小波基
+        ca3, cd3, cd2, cd1 = pywt.wavedec(data, w, level=3)  # 3层小波分解
+        # ca3 = ca3.squeeze(axis=0)  # ndarray数组减维：(1，a)->(a,)
+        # cd3 = cd3.squeeze(axis=0)
+        # cd2 = cd2.squeeze(axis=0)
+        # cd1 = cd1.squeeze(axis=0)
+        length1 = len(cd1)
+        length0 = len(data)
+
+        abs_cd1 = np.abs(np.array(cd1))
+        median_cd1 = np.median(abs_cd1)
+
+        sigma = (1.0 / 0.6745) * median_cd1
+        lamda = sigma * math.sqrt(2.0 * math.log(float(length0), math.e))
+        usecoeffs = []
+        usecoeffs.append(ca3)
+
+        # 软阈值方法
+        for k in range(length1):
+            if abs(cd1[k]) >= lamda / np.log2(2):
+                cd1[k] = self.sgn(cd1[k]) * (abs(cd1[k]) - lamda / np.log2(2))
+            else:
+                cd1[k] = 0.0
+
+        length2 = len(cd2)
+        for k in range(length2):
+            if abs(cd2[k]) >= lamda / np.log2(3):
+                cd2[k] = self.sgn(cd2[k]) * (abs(cd2[k]) - lamda / np.log2(3))
+            else:
+                cd2[k] = 0.0
+
+        length3 = len(cd3)
+        for k in range(length3):
+            if abs(cd3[k]) >= lamda / np.log2(4):
+                cd3[k] = self.sgn(cd3[k]) * (abs(cd3[k]) - lamda / np.log2(4))
+            else:
+                cd3[k] = 0.0
+
+        usecoeffs.append(cd3)
+        usecoeffs.append(cd2)
+        usecoeffs.append(cd1)
+        recoeffs = pywt.waverec(usecoeffs, w)  # 信号重构
+        if array:
+            return recoeffs
+        return recoeffs[-1]
+
+    # sgn函数
+    def sgn(self, num):
+        if num > 0.0:
+            return 1.0
+        elif num == 0.0:
+            return 0.0
+        else:
+            return -1.0
+
+    # 直线拟合
+    def polyfit_coeff(self, n: int, array: bool = False) -> Union[float, np.ndarray]:
+        result = polyfit(range(1, len(self.close[-n:-1]) + 1, 1), self.close[-n:-1], 1)
+        if array:
+            return result
+        return result[0]
+
+    # savgol_filter
+    def savgol(self, n: int, array: bool = False) -> Union[float, np.ndarray]:
+        result = savgol_filter(self.close[-n:-1], 29, 3, mode='nearest')
+        if array:
+            return result
+        return result[0]
+    # XLK增加------------------------------------------------------------------------------------
 class XlsArrayManager(object):
     """
     For:
