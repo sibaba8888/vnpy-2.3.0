@@ -12,7 +12,7 @@ from math import floor, ceil
 
 import numpy as np
 import talib
-
+from datetime import timedelta,time
 from .object import BarData, TickData
 from .constant import Exchange, Interval
 
@@ -260,16 +260,21 @@ class BarGenerator:
         """
         Update 1 minute bar into generator
         """
-        if self.interval == Interval.MINUTE:
-            self.update_bar_minute_window(bar)
-        else:
-            self.update_bar_hour_window(bar)
-
-    def update_bar_minute_window(self, bar: BarData) -> None:
-        """"""
-        # If not inited, create window bar object
+        # If not inited, creaate window bar object
         if not self.window_bar:
-            dt = bar.datetime.replace(second=0, microsecond=0)
+            # Generate timestamp for bar data
+            if self.interval == Interval.MINUTE:
+                dt = bar.datetime.replace(second=0, microsecond=0)
+            elif self.interval == Interval.HOUR:
+                dt = bar.datetime.replace(minute=0, second=0, microsecond=0)
+            elif self.interval == Interval.DAILY:
+                if bar.exchange.value in ("CFFEX","SHFE", "DCE", "CZCE", "INE"):
+                    if bar.datetime.weekday() == 4:
+                        dt = (bar.datetime + timedelta(3)).replace(hour=0, minute=0, second=0, microsecond=0)
+                    else:
+                        dt = (bar.datetime + timedelta(1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                else:
+                    dt = (bar.datetime + timedelta(1)).replace(hour=0, minute=0, second=0, microsecond=0)
             self.window_bar = BarData(
                 symbol=bar.symbol,
                 exchange=bar.exchange,
@@ -282,13 +287,9 @@ class BarGenerator:
         # Otherwise, update high/low price into window bar
         else:
             self.window_bar.high_price = max(
-                self.window_bar.high_price,
-                bar.high_price
-            )
+                self.window_bar.high_price, bar.high_price)
             self.window_bar.low_price = min(
-                self.window_bar.low_price,
-                bar.low_price
-            )
+                self.window_bar.low_price, bar.low_price)
 
         # Update close price/volume into window bar
         self.window_bar.close_price = bar.close_price
@@ -296,122 +297,42 @@ class BarGenerator:
         self.window_bar.open_interest = bar.open_interest
 
         # Check if window bar completed
-        if not (bar.datetime.minute + 1) % self.window:
+        finished = False
+
+        if self.interval == Interval.MINUTE:
+            # x-minute bar
+            if not (bar.datetime.minute + 1) % self.window:
+                finished = True
+        elif self.interval == Interval.HOUR:
+            if self.last_bar and bar.datetime.hour != self.last_bar.datetime.hour:
+                # 1-hour bar
+                if self.window == 1:
+                    finished = True
+                # x-hour bar
+                else:
+                    self.interval_count += 1
+
+                    if not self.interval_count % self.window:
+                        finished = True
+                        self.interval_count = 0
+        elif self.interval == Interval.DAILY:
+            if bar.datetime.time() == time(14, 59):
+                # 1天K线
+                if self.window == 1:
+                    finished = True
+                # X日线
+                else:
+                    self.interval_count += 1
+                    if not self.interval_count % self.window:
+                        finished = True
+                        self.interval_count = 0
+
+        if finished:
             self.on_window_bar(self.window_bar)
             self.window_bar = None
 
         # Cache last bar object
         self.last_bar = bar
-
-    def update_bar_hour_window(self, bar: BarData) -> None:
-        """"""
-        # If not inited, create window bar object
-        if not self.hour_bar:
-            dt = bar.datetime.replace(minute=0, second=0, microsecond=0)
-            self.hour_bar = BarData(
-                symbol=bar.symbol,
-                exchange=bar.exchange,
-                datetime=dt,
-                gateway_name=bar.gateway_name,
-                open_price=bar.open_price,
-                high_price=bar.high_price,
-                low_price=bar.low_price,
-                volume=bar.volume
-            )
-            return
-
-        finished_bar = None
-
-        # If minute is 59, update minute bar into window bar and push
-        if bar.datetime.minute == 59:
-            self.hour_bar.high_price = max(
-                self.hour_bar.high_price,
-                bar.high_price
-            )
-            self.hour_bar.low_price = min(
-                self.hour_bar.low_price,
-                bar.low_price
-            )
-
-            self.hour_bar.close_price = bar.close_price
-            self.hour_bar.volume += int(bar.volume)
-            self.hour_bar.open_interest = bar.open_interest
-
-            finished_bar = self.hour_bar
-            self.hour_bar = None
-
-        # If minute bar of new hour, then push existing window bar
-        elif bar.datetime.hour != self.hour_bar.datetime.hour:
-            finished_bar = self.hour_bar
-
-            dt = bar.datetime.replace(minute=0, second=0, microsecond=0)
-            self.hour_bar = BarData(
-                symbol=bar.symbol,
-                exchange=bar.exchange,
-                datetime=dt,
-                gateway_name=bar.gateway_name,
-                open_price=bar.open_price,
-                high_price=bar.high_price,
-                low_price=bar.low_price,
-                volume=bar.volume
-            )
-        # Otherwise only update minute bar
-        else:
-            self.hour_bar.high_price = max(
-                self.hour_bar.high_price,
-                bar.high_price
-            )
-            self.hour_bar.low_price = min(
-                self.hour_bar.low_price,
-                bar.low_price
-            )
-
-            self.hour_bar.close_price = bar.close_price
-            self.hour_bar.volume += int(bar.volume)
-            self.hour_bar.open_interest = bar.open_interest
-
-        # Push finished window bar
-        if finished_bar:
-            self.on_hour_bar(finished_bar)
-
-        # Cache last bar object
-        self.last_bar = bar
-
-    def on_hour_bar(self, bar: BarData) -> None:
-        """"""
-        if self.window == 1:
-            self.on_window_bar(bar)
-        else:
-            if not self.window_bar:
-                self.window_bar = BarData(
-                    symbol=bar.symbol,
-                    exchange=bar.exchange,
-                    datetime=bar.datetime,
-                    gateway_name=bar.gateway_name,
-                    open_price=bar.open_price,
-                    high_price=bar.high_price,
-                    low_price=bar.low_price
-                )
-            else:
-                self.window_bar.high_price = max(
-                    self.window_bar.high_price,
-                    bar.high_price
-                )
-                self.window_bar.low_price = min(
-                    self.window_bar.low_price,
-                    bar.low_price
-                )
-
-            self.window_bar.close_price = bar.close_price
-            self.window_bar.volume += int(bar.volume)
-            self.window_bar.open_interest = bar.open_interest
-
-            self.interval_count += 1
-            if not self.interval_count % self.window:
-                self.interval_count = 0
-                self.on_window_bar(self.window_bar)
-                self.window_bar = None
-
     def generate(self) -> Optional[BarData]:
         """
         Generate the bar data and call callback immediately.

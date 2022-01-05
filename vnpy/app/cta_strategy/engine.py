@@ -230,6 +230,15 @@ class CtaEngine(BaseEngine):
         position = event.data
 
         self.offset_converter.update_position(position)
+    def process_account_event(self,event: Event):             # xls 添加
+        """
+        收到账户事件推送
+        """
+        account = event.data
+        for strategy_name in self.strategies.keys():
+            strategy = self.strategies[strategy_name]
+            self.call_strategy_func(strategy, strategy.on_account, account)
+
 
     def check_stop_order(self, tick: TickData):
         """"""

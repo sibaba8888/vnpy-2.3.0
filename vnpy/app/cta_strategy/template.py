@@ -140,6 +140,12 @@ class CtaTemplate(ABC):
         Callback of new order data update.
         """
         pass
+    @virtual
+    def on_account(self, account):      # xls 添加
+        """
+        账户信息推送
+        """
+        pass
 
     @virtual
     def on_stop_order(self, stop_order: StopOrder):
