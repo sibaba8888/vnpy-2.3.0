@@ -16,30 +16,37 @@ class XlkWaveletRandomStrategy(CtaTemplate):
 
     author = "Xlk"
 
-    wavelet_window = 40
-    wavelet_value0 = 0.0
-    wavelet_value1 = 0.0
-    wavelet_value2 = 0.0
+    # wavelet_window = 40
+    # wavelet_value0 = 0.0
+    # wavelet_value1 = 0.0
+    # wavelet_value2 = 0.0
+    polyfit_window = 40
     pho_mean = 40.0
     plo_mean = 40.0
-    pho_sigma = 80.0
-    plo_sigma = 80.0
+    pho_sigma = 40.0
+    plo_sigma = 40.0
     daily_open = 0.0
     mark_buy = False
     mark_short = False
     number_trade = False
     fixed_size = 1
+    trailing_percent = 0.8
+    win_percent = 2.0
 
+    intra_trade_high = 0
+    intra_trade_low = 0
     long_stop = 0
     short_stop = 0
 
     parameters = [
-        "wavelet_window",
+        "polyfit_window",
         "pho_mean",
         "plo_mean",
         "pho_sigma",
         "plo_sigma",
-        "fixed_size"
+        "fixed_size",
+        "trailing_percent",
+        "win_percent"
     ]
     variables = [
         "wavelet_value0",
@@ -100,10 +107,12 @@ class XlkWaveletRandomStrategy(CtaTemplate):
             self.number_trade = True
         #    print("daily_open", self.daily_open)
         if self.daily_open != 0:
-            wavelet_array = am.wavelet_noising(self.wavelet_window, array=True)
-            self.wavelet_value0 = wavelet_array[-1]
-            self.wavelet_value1 = wavelet_array[-2]
-            self.wavelet_value2 = wavelet_array[-3]
+            # wavelet_array = am.wavelet_noising(self.wavelet_window, array=True)
+            # self.wavelet_value0 = wavelet_array[-1]
+            # self.wavelet_value1 = wavelet_array[-2]
+            # self.wavelet_value2 = wavelet_array[-3]
+            polyfit_value = am.polyfit_coeff(self.polyfit_window)
+
             # 回调购买方法----------------------------------
             # # 当价格低于（开盘价-最低价与开盘价差的均值（绝对值）），且小波信号转向上方时买多
             # mark_buy = bar.close_price < self.daily_open - self.plo_mean and \
@@ -114,14 +123,19 @@ class XlkWaveletRandomStrategy(CtaTemplate):
 
             # 趋势购买方法----------------------------------
             # 当价格低于（开盘价-最低价与开盘价差的均值（绝对值）），且小波信号转向向下时卖空
-            mark_short = bar.close_price < self.daily_open - self.plo_mean and \
-                         self.wavelet_value0 < self.wavelet_value1 < self.wavelet_value2
+            # mark_short = bar.close_price < self.daily_open - self.plo_mean and \
+            #              self.wavelet_value0 < self.wavelet_value1 < self.wavelet_value2
+            mark_short = bar.close_price < self.daily_open - self.plo_mean and polyfit_value < 0
+
             # 当价格高于（开盘价+最高价与开盘价差的均值（绝对值）），且小波信号转向上方时买多
-            mark_buy = bar.close_price > self.daily_open + self.pho_mean and \
-                       self.wavelet_value0 > self.wavelet_value1 > self.wavelet_value1
+            # mark_buy = bar.close_price > self.daily_open + self.pho_mean and \
+            #            self.wavelet_value0 > self.wavelet_value1 > self.wavelet_value1
+            mark_buy = bar.close_price > self.daily_open + self.pho_mean and polyfit_value > 0
 
             if bar.datetime.hour < 14 or (bar.datetime.hour == 14 and bar.datetime.minute < 59):
                 if self.pos == 0:
+                    self.intra_trade_high = bar.high_price
+                    self.intra_trade_low = bar.low_price
                     if self.number_trade:  # 一天只交易一次
                         if mark_buy:
                             self.buy(bar.close_price + 5, self.fixed_size)
@@ -130,11 +144,25 @@ class XlkWaveletRandomStrategy(CtaTemplate):
                             self.short(bar.close_price - 5, self.fixed_size)
                             self.number_trade = False
                 elif self.pos > 0:
-                    long_stop = self.daily_open - self.plo_mean - self.plo_sigma
+                    self.intra_trade_high = bar.high_price
+                    self.intra_trade_low = bar.low_price
+                    # long_stop = self.daily_open - self.plo_mean - self.plo_sigma
+                    long_stop = self.intra_trade_high * \
+                                (1 - self.trailing_percent / 100)
                     self.sell(long_stop, abs(self.pos), stop=True)
+                    # win_stop = self.intra_trade_high * (1 + self.win_percent / 100)
+                    # self.sell(win_stop, abs(self.pos), stop=True)
+
                 elif self.pos < 0:
-                    short_stop = self.daily_open + self.pho_mean + self.pho_sigma
+                    self.intra_trade_high = bar.high_price
+                    self.intra_trade_low = bar.low_price
+                    # short_stop = self.daily_open + self.pho_mean + self.pho_sigma
+                    short_stop = self.intra_trade_low * \
+                                 (1 + self.trailing_percent / 100)
                     self.cover(short_stop, abs(self.pos), stop=True)
+                    # win_stop1 = self.intra_trade_low * (1 - self.win_percent / 100)
+                    # self.cover(win_stop1, abs(self.pos), stop=True)
+
             if bar.datetime.hour == 14 and bar.datetime.minute == 59:
                 if self.pos > 0:
                     self.sell(bar.close_price - 5, abs(self.pos))

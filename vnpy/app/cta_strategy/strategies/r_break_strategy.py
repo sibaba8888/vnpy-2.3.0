@@ -15,16 +15,16 @@ class RBreakStrategy(CtaTemplate):
     """"""
     author = "KeKe"
 
-    setup_coef = 0.25
-    break_coef = 0.2
-    enter_coef_1 = 1.07
-    enter_coef_2 = 0.07
+    # setup_coef = 0.25
+    # break_coef = 0.2
+    # enter_coef_1 = 1.07
+    # enter_coef_2 = 0.07
     fixed_size = 1
     donchian_window = 30
 
-    trailing_long = 0.4
-    trailing_short = 0.4
-    multiplier = 3
+    trailing_long = 2.0
+    trailing_short = 2.0
+    multiplier = 1
     pivot = 0  # 枢轴点
     buy_break = 0  # 突破买入价
     sell_setup = 0  # 观察卖出价
@@ -45,12 +45,13 @@ class RBreakStrategy(CtaTemplate):
 
     exit_time = time(hour=14, minute=55)
 
-    parameters = ["setup_coef", "break_coef", "enter_coef_1", "enter_coef_2", "fixed_size", "donchian_window"]
+    parameters = ["trailing_long", "trailing_short", "multiplier","fixed_size", "donchian_window"]
     variables = ["buy_break", "sell_setup", "sell_enter", "buy_enter", "buy_setup", "sell_break"]
 
     def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
         """"""
-        super.__init__(cta_engine, strategy_name, vt_symbol, setting)
+        super().__init__(cta_engine, strategy_name, vt_symbol, setting)
+
         self.bg = BarGenerator(self.on_bar)
         self.am = ArrayManager()
         self.bars = []
@@ -109,13 +110,24 @@ class RBreakStrategy(CtaTemplate):
                 #
                 # self.buy_break = self.buy_setup + self.break_coef * (self.sell_setup - self.buy_setup)  # 突破买入价
                 # self.sell_break = self.sell_setup - self.break_coef * (self.sell_setup - self.buy_setup)  # 突破卖出价
+
                 self.pivot = (self.day_high + self.day_close + self.day_low) / 3
+
                 self.buy_break = self.day_high + 2 * (self.pivot - self.day_low)  # 突破买入价
                 self.sell_setup = self.pivot + (self.day_high - self.day_low)  # 观察卖出价
                 self.sell_enter = 2 * self.pivot - self.day_low  # 反转卖出价
+
                 self.buy_enter = 2 * self.pivot - self.day_high  # 反转买入价
                 self.buy_setup = self.pivot - (self.day_high - self.day_low)  # 观察买入价
                 self.sell_break = self.day_low - 2 * (self.day_high - self.pivot)  # 突破卖出价
+
+                # self.pivot = self.day_open
+                # self.buy_break = self.pivot + 40  # 突破买入价
+                # self.sell_setup = self.pivot + 30  # 观察卖出价
+                # self.sell_enter = self.pivot + 20  # 反转卖出价
+                # self.buy_enter = self.pivot - 20  # 反转买入价
+                # self.buy_setup = self.pivot - 30  # 观察买入价
+                # self.sell_break = self.pivot - 40  # 突破卖出价
 
             self.day_open = bar.open_price
             self.day_high = bar.high_price

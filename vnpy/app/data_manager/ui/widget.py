@@ -528,13 +528,15 @@ class ImportDialog(QtWidgets.QDialog):
 
         self.setLayout(form)
 
+
     def select_file(self):
         """"""
         result: str = QtWidgets.QFileDialog.getOpenFileName(
-            self, filter="CSV (*.csv)")
+            self, filter="CSV (*.csv);;XLS (*.xls)")   # xls 添加excel格式
         filename = result[0]
         if filename:
             self.file_edit.setText(filename)
+
 
 
 class DownloadDialog(QtWidgets.QDialog):
