@@ -12,7 +12,7 @@ from math import floor, ceil
 
 import numpy as np
 import talib
-from datetime import timedelta,time
+from datetime import timedelta, time
 from .object import BarData, TickData
 from .constant import Exchange, Interval
 # XLK增加------------------------------------------------------------------------------------
@@ -22,7 +22,6 @@ import math
 import pywt
 from numpy import polyfit, poly1d
 from scipy.signal import savgol_filter
-
 
 log_formatter = logging.Formatter('[%(asctime)s] %(message)s')
 
@@ -182,11 +181,11 @@ class BarGenerator:
     """
 
     def __init__(
-        self,
-        on_bar: Callable,
-        window: int = 0,
-        on_window_bar: Callable = None,
-        interval: Interval = Interval.MINUTE
+            self,
+            on_bar: Callable,
+            window: int = 0,
+            on_window_bar: Callable = None,
+            interval: Interval = Interval.MINUTE
     ):
         """Constructor"""
         self.bar: BarData = None
@@ -221,8 +220,8 @@ class BarGenerator:
         if not self.bar:
             new_minute = True
         elif (
-            (self.bar.datetime.minute != tick.datetime.minute)
-            or (self.bar.datetime.hour != tick.datetime.hour)
+                (self.bar.datetime.minute != tick.datetime.minute)
+                or (self.bar.datetime.hour != tick.datetime.hour)
         ):
             self.bar.datetime = self.bar.datetime.replace(
                 second=0, microsecond=0
@@ -275,7 +274,7 @@ class BarGenerator:
             elif self.interval == Interval.HOUR:
                 dt = bar.datetime.replace(minute=0, second=0, microsecond=0)
             elif self.interval == Interval.DAILY:
-                if bar.exchange.value in ("CFFEX","SHFE", "DCE", "CZCE", "INE"):
+                if bar.exchange.value in ("CFFEX", "SHFE", "DCE", "CZCE", "INE"):
                     if bar.datetime.weekday() == 4:
                         dt = (bar.datetime + timedelta(3)).replace(hour=0, minute=0, second=0, microsecond=0)
                     else:
@@ -340,6 +339,7 @@ class BarGenerator:
 
         # Cache last bar object
         self.last_bar = bar
+
     def generate(self) -> Optional[BarData]:
         """
         Generate the bar data and call callback immediately.
@@ -475,11 +475,11 @@ class ArrayManager(object):
         return result[-1]
 
     def apo(
-        self,
-        fast_period: int,
-        slow_period: int,
-        matype: int = 0,
-        array: bool = False
+            self,
+            fast_period: int,
+            slow_period: int,
+            matype: int = 0,
+            array: bool = False
     ) -> Union[float, np.ndarray]:
         """
         APO.
@@ -508,11 +508,11 @@ class ArrayManager(object):
         return result[-1]
 
     def ppo(
-        self,
-        fast_period: int,
-        slow_period: int,
-        matype: int = 0,
-        array: bool = False
+            self,
+            fast_period: int,
+            slow_period: int,
+            matype: int = 0,
+            array: bool = False
     ) -> Union[float, np.ndarray]:
         """
         PPO.
@@ -622,11 +622,11 @@ class ArrayManager(object):
         return result[-1]
 
     def macd(
-        self,
-        fast_period: int,
-        slow_period: int,
-        signal_period: int,
-        array: bool = False
+            self,
+            fast_period: int,
+            slow_period: int,
+            signal_period: int,
+            array: bool = False
     ) -> Union[
         Tuple[np.ndarray, np.ndarray, np.ndarray],
         Tuple[float, float, float]
@@ -696,11 +696,11 @@ class ArrayManager(object):
         return result[-1]
 
     def ultosc(
-        self,
-        time_period1: int = 7,
-        time_period2: int = 14,
-        time_period3: int = 28,
-        array: bool = False
+            self,
+            time_period1: int = 7,
+            time_period2: int = 14,
+            time_period3: int = 28,
+            array: bool = False
     ) -> Union[float, np.ndarray]:
         """
         Ultimate Oscillator.
@@ -720,10 +720,10 @@ class ArrayManager(object):
         return result[-1]
 
     def boll(
-        self,
-        n: int,
-        dev: float,
-        array: bool = False
+            self,
+            n: int,
+            dev: float,
+            array: bool = False
     ) -> Union[
         Tuple[np.ndarray, np.ndarray],
         Tuple[float, float]
@@ -740,10 +740,10 @@ class ArrayManager(object):
         return up, down
 
     def keltner(
-        self,
-        n: int,
-        dev: float,
-        array: bool = False
+            self,
+            n: int,
+            dev: float,
+            array: bool = False
     ) -> Union[
         Tuple[np.ndarray, np.ndarray],
         Tuple[float, float]
@@ -760,7 +760,7 @@ class ArrayManager(object):
         return up, down
 
     def donchian(
-        self, n: int, array: bool = False
+            self, n: int, array: bool = False
     ) -> Union[
         Tuple[np.ndarray, np.ndarray],
         Tuple[float, float]
@@ -776,9 +776,9 @@ class ArrayManager(object):
         return up[-1], down[-1]
 
     def aroon(
-        self,
-        n: int,
-        array: bool = False
+            self,
+            n: int,
+            array: bool = False
     ) -> Union[
         Tuple[np.ndarray, np.ndarray],
         Tuple[float, float]
@@ -841,10 +841,10 @@ class ArrayManager(object):
         return result[-1]
 
     def adosc(
-        self,
-        fast_period: int,
-        slow_period: int,
-        array: bool = False
+            self,
+            fast_period: int,
+            slow_period: int,
+            array: bool = False
     ) -> Union[float, np.ndarray]:
         """
         ADOSC.
@@ -937,7 +937,26 @@ class ArrayManager(object):
         if array:
             return result
         return result[0]
+
+
+    # 箱体
+    def box(self, n: int, array: bool = False
+            ) -> Union[
+        Tuple[np.ndarray, np.ndarray],
+        Tuple[float, float]
+    ]:
+        """
+        箱体.
+        """
+        up = talib.MAX(self.close, n)
+        down = talib.MIN(self.close, n)
+
+        if array:
+            return up, down
+        return up[-1], down[-1]
     # XLK增加------------------------------------------------------------------------------------
+
+
 class XlsArrayManager(object):
     """
     For:
@@ -968,7 +987,7 @@ class XlsArrayManager(object):
         if not self.inited and self.count >= self.size:
             self.inited = True
         # 每new bar update
-        if finish:   # 每window 时间更新一次
+        if finish:  # 每window 时间更新一次
             self.open_array[-1] = bar.open_price
             self.high_array[-1] = bar.high_price
             self.low_array[-1] = bar.low_price
@@ -997,6 +1016,7 @@ class XlsArrayManager(object):
                 self.low_array[-1] = min(self.low_array[-1], bar.low_price)
                 self.close_array[-1] = bar.close_price
                 self.volume_array[-1] = self.volume_array[-1] + bar.volume
+
     @property
     def open(self) -> np.ndarray:
         """
@@ -1464,6 +1484,7 @@ class XlsArrayManager(object):
         if array:
             return result
         return result[-1]
+
 
 def virtual(func: Callable) -> Callable:
     """
