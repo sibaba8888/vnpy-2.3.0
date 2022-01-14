@@ -10,30 +10,30 @@ from vnpy.app.cta_strategy import (
 )
 import matplotlib.pyplot as plt
 import datetime
+from vnpy.trader.constant import Interval, Offset
 
 
-class XlkTrendMinStrategy(CtaTemplate):
+class XlkTrendDayStrategy(CtaTemplate):
     """"""
 
     author = "Xlk"
-    polyfit_window = 40
-    box_window = 10
+    rate_increase = 5
     daily_open = 0.0
     mark_buy = False
     mark_short = False
     fixed_size = 1
     trailing_percent = 0.8
-    box_up = 0
+    box_up = 1000000
     box_down = 0
     intra_trade_high = 0
     intra_trade_low = 0
-
+    fast_ma0 = 0
+    fast_ma1 = 0
     long_stop = 0
     short_stop = 0
 
     parameters = [
-        "polyfit_window",
-        "box_window",
+        "rate_increase",
         "fixed_size",
         "trailing_percent"
     ]
@@ -49,7 +49,7 @@ class XlkTrendMinStrategy(CtaTemplate):
         super().__init__(cta_engine, strategy_name, vt_symbol, setting)
 
         # self.bg = BarGenerator(self.on_bar)
-        self.bg = BarGenerator(self.on_bar, 30, self.on_30min_bar)
+        self.bg = BarGenerator(self.on_bar, 1, self.on_daily_bar, interval=Interval.DAILY)
         self.am = ArrayManager()
         self.bars = []
 
@@ -84,7 +84,7 @@ class XlkTrendMinStrategy(CtaTemplate):
         """
         self.bg.update_bar(bar)
 
-    def on_30min_bar(self, bar: BarData):
+    def on_daily_bar(self, bar: BarData):
 
         """
         Callback of new bar data update.
@@ -102,27 +102,39 @@ class XlkTrendMinStrategy(CtaTemplate):
         else:
             self.bars.pop(0)
         last_bar = self.bars[-2]
+
+        # print(bar.datetime)
+
+        # fast_ma = am.sma(self.polyfit_window,array=True)
+        # self.fast_ma0 = fast_ma[-1]
+        # self.fast_ma1 = fast_ma[-2]
+
         # polyfit_value = am.polyfit_coeff(self.polyfit_window)
-        savgol_arr = am.savgol(self.polyfit_window, array=True)
-        enter_time=bar.datetime
+        # savgol_arr = am.savgol(self.polyfit_window, array=True)
+        # enter_time=bar.datetime
         # self.mark_buy = polyfit_value > 0.2 and bar.close_price > self.box_up
         # self.mark_short = polyfit_value < -0.2 and bar.close_price < self.box_down
-        self.mark_buy = savgol_arr[-1] > savgol_arr[-2] and bar.close_price > self.box_up
+        # self.mark_buy = savgol_arr[-1] > savgol_arr[-2]
+
         # if self.mark_buy:
         #     print(savgol_arr[-1], savgol_arr[-2], savgol_arr[-3])
-        self.mark_short = savgol_arr[-1] < savgol_arr[-2] and bar.close_price < self.box_down
+        # self.mark_short = savgol_arr[-1] < savgol_arr[-2]
 
-        # self.mark_buy = polyfit_value > 0.2
-        # self.mark_short = polyfit_value < -0.2
+        self.mark_buy = bar.close_price > self.box_up
+
+        self.mark_short = bar.close_price < self.box_down
+
         if self.pos == 0:
             self.intra_trade_high = bar.high_price
             self.intra_trade_low = bar.low_price
             if self.mark_buy:
                 self.buy(bar.close_price + 5, self.fixed_size)
-                enter_time = bar.datetime
+                buy_enter_time = bar.datetime
+                print('buy_enter_time',buy_enter_time)
             elif self.mark_short:
                 self.short(bar.close_price - 5, self.fixed_size)
-                enter_time = bar.datetime
+                short_enter_time = bar.datetime
+                print('short_enter_time',short_enter_time)
 
         elif self.pos > 0:
             self.intra_trade_high = bar.high_price
@@ -136,6 +148,16 @@ class XlkTrendMinStrategy(CtaTemplate):
             short_stop = self.intra_trade_low * (1 + self.trailing_percent / 100)
             self.cover(short_stop, abs(self.pos), stop=True)
 
+        # 可伸缩箱体
+        polyfit_window = 2
+        self.box_up, self.box_down = am.box(polyfit_window)
+        # print(self.box_up, self.box_down)
+        temp = (self.box_up - self.box_down) / bar.close_price * 100
+        while temp < self.rate_increase:
+            polyfit_window += 1
+            self.box_up, self.box_down = am.box(polyfit_window)
+            temp = (self.box_up - self.box_down) / bar.close_price * 100
+        # print('polyfit_window:', polyfit_window,'temp:', temp)
         # if (bar.datetime-enter_time).days > 10:
         #     if self.pos > 0:
         #         self.sell(bar.close_price - 5, abs(self.pos))

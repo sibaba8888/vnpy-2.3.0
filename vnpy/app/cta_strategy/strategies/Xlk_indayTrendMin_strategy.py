@@ -152,7 +152,7 @@ class XlkIndayTrendMinStrategy(CtaTemplate):
                 elif self.pos > 0:
                     self.intra_trade_high = bar.high_price
                     self.intra_trade_low = bar.low_price
-                    # long_stop = self.daily_open - self.p_mean - self.plo_sigma
+                    # long_stop = self.daily_open - 2.0*self.p_mean
                     long_stop = self.intra_trade_high * \
                                 (1 - self.trailing_percent / 100)
                     self.sell(long_stop, abs(self.pos), stop=True)
@@ -162,7 +162,7 @@ class XlkIndayTrendMinStrategy(CtaTemplate):
                 elif self.pos < 0:
                     self.intra_trade_high = bar.high_price
                     self.intra_trade_low = bar.low_price
-                    # short_stop = self.daily_open + self.p_mean + self.p_sigma
+                    # short_stop = self.daily_open + 2.0*self.p_mean
                     short_stop = self.intra_trade_low * \
                                  (1 + self.trailing_percent / 100)
                     self.cover(short_stop, abs(self.pos), stop=True)

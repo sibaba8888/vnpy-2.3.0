@@ -933,11 +933,10 @@ class ArrayManager(object):
 
     # savgol_filter
     def savgol(self, n: int, array: bool = False) -> Union[float, np.ndarray]:
-        result = savgol_filter(self.close[-n:-1], 29, 3, mode='nearest')
+        result = savgol_filter(self.close[-n:-1], 15, 3, mode='nearest')
         if array:
             return result
         return result[0]
-
 
     # 箱体
     def box(self, n: int, array: bool = False
